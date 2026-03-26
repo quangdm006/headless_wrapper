@@ -1,0 +1,44 @@
+name: CI/CD Infra
+
+on:
+  push:
+    branches:
+      - main
+  # Thêm dòng này để lắng nghe tín hiệu "bấm chuông" từ Repo App
+  repository_dispatch:
+    types: [app_updated]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Deploy Infrastructure
+    runs-on: self-hosted
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          cat > .env << EOF
+          WORDPRESS_DB_HOST=${{ secrets.WORDPRESS_DB_HOST }}
+          WORDPRESS_DB_NAME=${{ secrets.WORDPRESS_DB_NAME }}
+          WORDPRESS_DB_USER=${{ secrets.WORDPRESS_DB_USER }}
+          WORDPRESS_DB_PASSWORD=${{ secrets.WORDPRESS_DB_PASSWORD }}
+          MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          EOF
+
+      - name: Deploy
+        run: |
+          # Đảm bảo lệnh chạy tại thư mục chứa compose.yaml của Infra
+          docker compose -f compose.yaml down
+          
+          # Pull hoặc nhận image mới nhất đã build từ trước đó
+          docker compose -f compose.yaml up -d
+          
+          # Dọn dẹp các image cũ (dangling) để tránh đầy ổ cứng server
+          docker image prune -f
